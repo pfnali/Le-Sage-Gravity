@@ -1,0 +1,179 @@
+\begin{lstlisting}[language=Python, caption={Core algorithm for Push Gravity (PG) shell parcellation including embedded kinematic centrifugal acceleration corrections.}, label={lst:pg_core_engine}]
+import numpy as np
+from scipy.integrate import dblquad
+
+def calculate_gravity_pg_core(planet_params, station_type='equator', C_coeff=0.0, omega=0.0):
+    """
+    Computes the effective surface gravity (g_eff) using exact shell-by-shell 
+    chord parcellation under the mapping condition: (Lambda^2 * u_e0) / 4pi = G.
+    Natively accounts for the kinetic centrifugal acceleration at the equator.
+    
+    Parameters:
+    -----------
+    planet_params : dict
+        Contains lists for semi-major axes 'a' (m), flattenings 'f', 
+        and volumetric densities 'rho' (kg/m^3), ordered from Layer 1 to 11.
+    station_type : str
+        'equator' or 'polar' positioning for the local coordinate origin P.
+    C_coeff : float
+        Dimensionless forward-scattering coefficient (C).
+    omega : float
+        Planetary angular rotation velocity (rad/s). Defaults to 0.0 (static).
+    """
+    # Universal Gravitational Constant
+    G = 6.67430e-11 
+    
+    # Establish surface ellipsoid parameters for local origin P placement
+    a_surf = planet_params['a'][-1]
+    f_surf = planet_params['f'][-1]
+    c_surf = a_surf * (1.0 - f_surf)
+    
+    if station_type == 'polar':
+        X_P, Y_P, Z_P = 0.0, 0.0, c_surf
+    else: # equator
+        X_P, Y_P, Z_P = a_surf, 0.0, 0.0
+
+    a = np.array(planet_params['a'])
+    f = np.array(planet_params['f'])
+    c = a * (1.0 - f)
+    rho = np.array(planet_params['rho'])
+    
+    def get_chord_areal_density(alpha, beta):
+        # Directional unit vectors mapped to planetary frame from station P
+        if station_type == 'polar':
+            ux = np.sin(alpha) * np.cos(beta)
+            uy = np.sin(alpha) * np.sin(beta)
+            uz = -np.cos(alpha)
+        else:
+            ux = -np.cos(alpha)
+            uy = np.sin(alpha) * np.cos(beta)
+            uz = np.sin(alpha) * np.sin(beta)
+            
+        s1 = np.zeros(12) 
+        s2 = np.zeros(12)
+        
+        # Ellipsoidal intersection quadratic metric system for boundaries i=1..11
+        for idx in range(11):
+            i = idx + 1
+            ai = a[idx]
+            ci = c[idx]
+            
+            A_quad = (ux**2 + uy**2) / ai**2 + (uz**2) / ci**2
+            B_quad = (X_P*ux + Y_P*uy) / ai**2 + (Z_P*uz) / ci**2
+            C_quad = (X_P**2 + Y_P**2) / ai**2 + (Z_P**2) / ci**2 - 1.0
+            
+            discriminant = B_quad**2 - A_quad*C_quad
+            if discriminant >= 0:
+                root1 = (-B_quad - np.sqrt(discriminant)) / A_quad
+                root2 = (-B_quad + np.sqrt(discriminant)) / A_quad
+                s1[i] = min(root1, root2)
+                s2[i] = max(root1, root2)
+            else:
+                s1[i] = 0.0
+                s2[i] = 0.0
+                
+        # Enforce baseline boundary origin condition s_{1,0} = s_{2,0} = 0
+        s1[0] = 0.0
+        s2[0] = 0.0
+        
+        # Structural shell parcellation loop (Equations 1 & 2)
+        total_lambda = 0.0
+        for idx in range(11):
+            i = idx + 1
+            delta_s = s1[i-1] - s1[i] + s2[i] - s2[i-1]
+            lambda_ch_i = rho[idx] * delta_s
+            total_lambda += lambda_ch_i
+            
+        return total_lambda
+
+    # Integral definition over the internal local horizon hemisphere
+    integrand = lambda alpha, beta: get_chord_areal_density(alpha, beta) * np.cos(alpha) * np.sin(alpha)
+    alpha_max = np.pi / 2.0
+    
+    integral_value, _ = dblquad(integrand, 0.0, 2.0*np.pi, lambda x: 0.0, lambda x: alpha_max)
+    
+    # Net pure gravitational acceleration mapping
+    g_net = G * (1.0 - C_coeff) * integral_value
+    
+    # Apply kinematic centrifugal reduction at the equator if omega is supplied
+    if station_type == 'equator' and omega > 0.0:
+        centrifugal_acceleration = (omega**2) * a_surf
+        g_eff = g_net - centrifugal_acceleration
+    else:
+        g_eff = g_net
+        
+    return g_eff
+\end{lstlisting}
+%
+\begin{lstlisting}[language=Python, caption={Verification testbench evaluating Earth's effective surface gravity (g_eff) against true geodetic reference marks.}, label={lst:pg_verification_testbench}]
+# (Requires calculate_gravity_pg_core from Listing 1)
+import numpy as np
+
+# Structured 11-Layer Earth Parameter Profiles from Layer 1 (Inner Core) to Layer 11 (Crust)
+earth_prem_profile = {
+    'a': [1221.5e3, 3480.0e3, 3630.0e3, 5701.0e3, 5771.0e3, 5971.0e3, 6151.0e3, 6346.0e3, 6356.0e3, 6368.0e3, 6378.1e3],
+    'f': list(np.linspace(1.0/415.0, 1.0/298.257, 11)),
+    'rho': [13000.0, 11500.0, 10000.0, 5200.0, 4800.0, 4400.0, 4000.0, 3600.0, 3400.0, 3000.0, 2700.0]
+}
+
+# Earth true sidereal rotation velocity metric (rad/s)
+omega_earth = 7.292115e-5 
+
+# Calibrated optimization index matching geodetic profile constraints
+C_optimized = 0.037536
+
+# Run simulation tracking
+g_earth_eff_eq = calculate_gravity_pg_core(earth_prem_profile, station_type='equator', C_coeff=C_optimized, omega=omega_earth)
+g_earth_eff_pol = calculate_gravity_pg_core(earth_prem_profile, station_type='polar', C_coeff=C_optimized, omega=omega_earth)
+
+print("=== REFRESHED PUSH GRAVITY VERIFICATION OUTPUT ===")
+print(f"Effective Polar Gravity (Model)   : {g_earth_eff_pol:.4f} m/s^2 (Target: 9.8322)")
+print(f"Effective Equat. Gravity (Model)  : {g_earth_eff_eq:.4f} m/s^2 (Target: 9.7803)")
+print(f"Effective Dynamic Delta g (Pol-Eq): {g_earth_eff_pol - g_earth_eff_eq:.4f} m/s^2")
+\end{lstlisting}
+%
+\begin{lstlisting}[language=Python, caption={Inversion numerical protocol isolating C_opt by targeting raw, uncorrected geodetic surface data directly.}, label={lst:pg_optimizer_inversion}]
+from scipy.optimize import minimize_scalar
+# (Requires calculate_gravity_pg_core and earth_prem_profile from the previous listings)
+
+def optimize_forward_scattering_direct():
+    """
+    Finds the optimized C coefficient by matching the geometric model outputs
+    directly against Earth's raw observed effective surface gravity baselines.
+    """
+    # Direct observational geodetic target profiles (Raw surface measurements)
+    target_g_pol = 9.8322 # Polar limit (completely centrifugal-free)
+    target_g_eq  = 9.7803 # Raw equatorial surface metric
+    
+    omega_earth = 7.292115e-5
+    
+    # Pre-compute unscaled raw pure-gravitational geometric integrations at C = 0, omega = 0
+    g_grav_pol_raw = calculate_gravity_pg_core(earth_prem_profile, station_type='polar', C_coeff=0.0, omega=0.0)
+    g_grav_eq_raw  = calculate_gravity_pg_core(earth_prem_profile, station_type='equator', C_coeff=0.0, omega=0.0)
+    
+    a_surf = earth_prem_profile['a'][-1]
+    centrifugal_loss = (omega_earth**2) * a_surf
+    
+    # Loss objective tracking through least-squares minimization
+    def objective_loss(C):
+        g_model_pol = (1.0 - C) * g_grav_pol_raw
+        g_model_eq  = ((1.0 - C) * g_grav_eq_raw) - centrifugal_loss
+        
+        residual = (g_model_pol - target_g_pol)**2 + (g_model_eq - target_g_eq)**2
+        return residual
+
+    # Restrict optimization space to physically coherent bounds: 0 <= C < 1
+    res = minimize_scalar(objective_loss, bounds=(0.0, 0.99), method='bounded')
+    C_opt = res.x
+    
+    print("=== REFRESHED SCATTERING COEFFICIENT DIRECT OPTIMIZATION ===")
+    print(f"Optimized Forward-Scattering C_opt : {C_opt:.6f}")
+    print(f"Model Effective Equat. Gravity     : {((1.0 - C_opt) * g_grav_eq_raw) - centrifugal_loss:.4f} m/s^2")
+    print(f"Model Effective Polar Gravity      : {(1.0 - C_opt) * g_grav_pol_raw:.4f} m/s^2")
+    
+    return C_opt
+
+# Execute direct numerical inversion loop
+C_opt_verified = optimize_forward_scattering_direct()
+\end{lstlisting}
+
