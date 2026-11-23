@@ -176,4 +176,793 @@ def optimize_forward_scattering_direct():
 # Execute direct numerical inversion loop
 C_opt_verified = optimize_forward_scattering_direct()
 \end{lstlisting}
+%
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{teal},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=8pt,
+    backgroundcolor=\color{black!2},
+    frame=single,
+    rulecolor=\color{black!30},
+    breaklines=true,
+    breakatwhitespace=true,
+    showstringspaces=false,
+    tabsize=4,
+    captionpos=b
+}
+
+\begin{lstlisting}[style=pythonstyle, caption={Python script for computing and plotting the scattering-corrected $q$-factor over a logarithmic opacity domain.}, label={lst:q_factor_plot}]
+import numpy as np
+import matplotlib.pyplot as plt
+
+def q_factor(u, C):
+    """Computes q(u, C) with a Taylor series safeguard for u -> 0."""
+    u = np.asarray(u, dtype=float)
+    res = np.zeros_like(u)
+    
+    # Use Taylor series for u < 1e-4 to avoid numerical cancellation
+    small = u < 1e-4
+    u_s = u[small]
+    res[small] = (1.0 - C) - 0.75 * (1.0 - 2.0 * C) * u_s + 0.4 * (1.0 - 3.0 * C) * (u_s**2)
+    
+    # Exact analytical formula for u >= 1e-4
+    u_l = u[~small]
+    term1 = 1.0 / u_l
+    term2 = (1.0 + 2.0 * C) / (2.0 * (u_l**3))
+    term3 = np.exp(-2.0 * u_l) * (
+        (2.0 * C / u_l) + ((1.0 + 2.0 * C) / (u_l**2)) + ((1.0 + 2.0 * C) / (2.0 * (u_l**3)))
+    )
+    res[~small] = 0.75 * (term1 - term2 + term3)
+    
+    return res
+
+# Logarithmic opacity domain u in [10^-3, 10^2]
+u_vals = np.logspace(-3, 2, 1000)
+C_values = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+colors = ['#000000', '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+linestyles = ['-', '--', '-.', ':', '--', '-.']
+
+fig, ax = plt.subplots(figsize=(8, 5), dpi=300)
+
+# Shade parameter range between C=0.0 and C=0.5
+q_upper = q_factor(u_vals, 0.0)
+q_lower = q_factor(u_vals, 0.5)
+ax.fill_between(u_vals, q_lower, q_upper, color='steelblue', alpha=0.15,
+                label=r'Range: $C \in [0, 0.5]$')
+
+# Plot individual curves
+for idx, C in enumerate(C_values):
+    lw = 2.5 if C == 0.0 else 1.4
+    lbl = r'$C = 0.0$ (Pure Absorption)' if C == 0.0 else f'$C = {C:.1f}$'
+    ax.plot(u_vals, q_factor(u_vals, C), color=colors[idx],
+            linestyle=linestyles[idx], linewidth=lw, label=lbl)
+
+# Configure logarithmic x-axis and linear y-axis
+ax.set_xscale('log')
+ax.set_xlim(1e-3, 100)
+ax.set_ylim(0, 1.0)
+ax.set_xlabel('opacity u', fontsize=12)
+ax.set_ylabel('q-factor', fontsize=12)
+ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.6)
+ax.legend(loc='upper right', frameon=True, fontsize=10)
+
+plt.tight_layout()
+
+# Export vector PDF for LaTeX inclusion
+plt.savefig('q_factor_plot.pdf', format='pdf', bbox_inches='tight')
+plt.show()
+\end{lstlisting}
+%
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{teal},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=8pt,
+    backgroundcolor=\color{black!2},
+    frame=single,
+    rulecolor=\color{black!30},
+    breaklines=true,
+    breakatwhitespace=true,
+    showstringspaces=false,
+    tabsize=4,
+    captionpos=b
+}
+
+\begin{lstlisting}[style=pythonstyle, caption={Python script for plotting the scattering-corrected $q$-factor across sub-critical, critical ($C = 1.0$), and super-critical ($C > 1.0$) regimes.}, label={lst:q_factor_critical}]
+import numpy as np
+import matplotlib.pyplot as plt
+
+def q_factor(u, C):
+    """Computes q(u, C) with a Taylor series safeguard for u -> 0."""
+    u = np.asarray(u, dtype=float)
+    res = np.zeros_like(u)
+    
+    # Use Taylor series for u < 1e-4 to avoid numerical cancellation
+    small = u < 1e-4
+    u_s = u[small]
+    res[small] = (1.0 - C) - 0.75 * (1.0 - 2.0 * C) * u_s + 0.4 * (1.0 - 3.0 * C) * (u_s**2)
+    
+    # Exact analytical formula for u >= 1e-4
+    u_l = u[~small]
+    term1 = 1.0 / u_l
+    term2 = (1.0 + 2.0 * C) / (2.0 * (u_l**3))
+    term3 = np.exp(-2.0 * u_l) * (
+        (2.0 * C / u_l) + ((1.0 + 2.0 * C) / (u_l**2)) + ((1.0 + 2.0 * C) / (2.0 * (u_l**3)))
+    )
+    res[~small] = 0.75 * (term1 - term2 + term3)
+    
+    return res
+
+# Logarithmic opacity domain u in [10^-3, 10^2]
+u_vals = np.logspace(-3, 2, 1000)
+C_values = [0.0, 0.25, 0.5, 0.75, 1.0, 1.2]
+colors = ['#000000', '#1f77b4', '#2ca02c', '#ff7f0e', '#d62728', '#9467bd']
+linestyles = ['-', '--', '-.', ':', '-', '--']
+
+fig, ax = plt.subplots(figsize=(8.5, 5.2), dpi=300)
+
+# Shade the strictly attractive scattering band between C=0.0 and C=1.0
+q_upper = q_factor(u_vals, 0.0)
+q_crit = q_factor(u_vals, 1.0)
+ax.fill_between(u_vals, q_crit, q_upper, color='steelblue', alpha=0.12,
+                label=r'Attractive Band: $C \in [0, 1.0]$')
+
+# Plot individual curves
+for idx, C in enumerate(C_values):
+    lw = 2.5 if C in (0.0, 1.0) else 1.4
+    if C == 0.0:
+        lbl = r'$C = 0.00$ (Pure Absorption)'
+    elif C == 1.0:
+        lbl = r'$C = 1.00$ (Critical Cancellation)'
+    elif C == 1.2:
+        lbl = r'$C = 1.20$ (Repulsive Thin Limit)'
+    else:
+        lbl = f'$C = {C:.2f}$'
+        
+    ax.plot(u_vals, q_factor(u_vals, C), color=colors[idx],
+            linestyle=linestyles[idx], linewidth=lw, label=lbl)
+
+# Horizontal zero-reference line separating attractive (q > 0) and repulsive (q < 0) regimes
+ax.axhline(0.0, color='black', linestyle=':', linewidth=1.0, alpha=0.7)
+
+# Configure logarithmic x-axis and linear y-axis
+ax.set_xscale('log')
+ax.set_xlim(1e-3, 100)
+ax.set_ylim(-0.3, 1.0)
+ax.set_xlabel('opacity u', fontsize=12)
+ax.set_ylabel('q-factor', fontsize=12)
+ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.6)
+ax.legend(loc='upper right', frameon=True, fontsize=9.5)
+
+plt.tight_layout()
+
+# Export vector PDF for LaTeX inclusion
+plt.savefig('q_factor_critical_regimes.pdf', format='pdf', bbox_inches='tight')
+plt.show()
+\end{lstlisting}
+%
+\begin{lstlisting}[language=Python, caption={Complete Push Gravity (PG) continuous integration engine using original PREM polynomials (Dziewonski \& Anderson, 1981) and branch-free exact shell segmentation (C = 0).}, label={lst:pg_prem_continuous_complete}]
+import numpy as np
+from scipy.integrate import dblquad
+
+# Original 11-Layer PREM Polynomial Coefficients (Dziewonski & Anderson, 1981)
+# Ordered from Layer 1 (Inner Core) to Layer 11 (Upper Crust / Ocean avg)
+# rho_i(x) = c0 + c1*x + c2*x^2 + c3*x^3 [kg/m^3], where x = r_eq / a_surf
+prem_continuous_11 = {
+    'a': [1221.5e3, 3480.0e3, 3630.0e3, 5701.0e3, 5771.0e3, 
+          5971.0e3, 6151.0e3, 6291.0e3, 6346.6e3, 6356.0e3, 6371.0e3],
+    'f': list(np.linspace(1.0/415.0, 1.0/298.257, 11)),
+    'poly': [
+        [13088.5,     0.0,  -8838.1,     0.0], # 1: Inner Core (0 - 1221.5 km)
+        [12581.5, -1263.8,  -3642.6, -5528.1], # 2: Outer Core (1221.5 - 3480 km)
+        [ 7956.5, -6476.1,   5528.3, -3080.7], # 3: D'' Layer (3480 - 3630 km)
+        [ 7956.5, -6476.1,   5528.3, -3080.7], # 4: Lower Mantle Base (3630 - 5701 km)
+        [ 5319.7, -1483.6,      0.0,     0.0], # 5: Lower Mantle Upper (5701 - 5771 km)
+        [11249.4, -8029.8,      0.0,     0.0], # 6: Transition Zone (5771 - 5971 km)
+        [ 7108.9, -3804.5,      0.0,     0.0], # 7: Transition Zone (5971 - 6151 km)
+        [ 2691.0,   692.4,      0.0,     0.0], # 8: LVZ / LID (6151 - 6291 km)
+        [ 2691.0,   692.4,      0.0,     0.0], # 9: Upper Mantle (6291 - 6346.6 km)
+        [ 2900.0,     0.0,      0.0,     0.0], # 10: Lower Crust (6346.6 - 6356 km)
+        [ 2600.0,     0.0,      0.0,     0.0]  # 11: Upper Crust / Ocean (6356 - 6371 km)
+    ]
+}
+
+# 5-point Gauss-Legendre quadrature nodes and weights (exact up to degree 9)
+GL_NODES, GL_WEIGHTS = np.polynomial.legendre.leggauss(5)
+
+def calculate_gravity_pg_prem_continuous(planet_params, station_type='equator', omega=0.0):
+    """
+    Computes effective surface gravity (g_eff) with C = 0 using continuous space 
+    integration along ellipsoidal chords and original PREM density polynomials.
+    Preserves the exact branch-free boundary segmentation algorithm.
+    """
+    G = 6.67430e-11
+    a = np.array(planet_params['a'])
+    f = np.array(planet_params['f'])
+    c = a * (1.0 - f)
+    polys = np.array(planet_params['poly'])
+    
+    a_surf = a[-1]
+    c_surf = c[-1]
+    
+    # Station P coordinates in global Cartesian frame
+    if station_type == 'polar':
+        X_P, Y_P, Z_P = 0.0, 0.0, c_surf
+    else:
+        X_P, Y_P, Z_P = a_surf, 0.0, 0.0
+
+    def eval_rho_layer(idx, s_val, ux, uy, uz):
+        # 3D position vector X(s) = X_P + s * u
+        X = X_P + s_val * ux
+        Y = Y_P + s_val * uy
+        Z = Z_P + s_val * uz
+        # Normalized equivalent ellipsoidal radius x (unclamped for exact algebraic cancellation)
+        fi = f[idx]
+        r_eq = np.sqrt(X**2 + Y**2 + (Z / (1.0 - fi))**2)
+        x = r_eq / a_surf
+        c0, c1, c2, c3 = polys[idx]
+        return c0 + c1*x + c2*(x**2) + c3*(x**3)
+
+    def integrate_oriented_segment(idx, s_start, s_end, ux, uy, uz):
+        # Oriented line integral from s_start to s_end preserving sign
+        half_len = 0.5 * (s_end - s_start)
+        if half_len == 0.0:
+            return 0.0
+        mid_pt = 0.5 * (s_end + s_start)
+        acc = 0.0
+        for node, weight in zip(GL_NODES, GL_WEIGHTS):
+            s_q = mid_pt + half_len * node
+            acc += weight * eval_rho_layer(idx, s_q, ux, uy, uz)
+        return half_len * acc
+
+    def get_continuous_areal_density(alpha, beta):
+        # Directional unit vector mapped from local normal at P
+        if station_type == 'polar':
+            ux = np.sin(alpha) * np.cos(beta)
+            uy = np.sin(alpha) * np.sin(beta)
+            uz = -np.cos(alpha)
+        else:
+            ux = -np.cos(alpha)
+            uy = np.sin(alpha) * np.cos(beta)
+            uz = np.sin(alpha) * np.sin(beta)
+            
+        s1 = np.zeros(12)
+        s2 = np.zeros(12)
+        
+        # Solve quadratic intersection A_i*s^2 + 2*B_i*s + C_i = 0 for i = 1..11
+        for idx in range(11):
+            i = idx + 1
+            ai, ci = a[idx], c[idx]
+            A_q = (ux**2 + uy**2)/ai**2 + (uz**2)/ci**2
+            B_q = (X_P*ux + Y_P*uy)/ai**2 + (Z_P*uz)/ci**2
+            C_q = (X_P**2 + Y_P**2)/ai**2 + (Z_P**2)/ci**2 - 1.0
+            disc = B_q**2 - A_q*C_q
+            if disc >= 0.0:
+                sqrt_d = np.sqrt(disc)
+                s1[i] = (-B_q - sqrt_d) / A_q
+                s2[i] = (-B_q + sqrt_d) / A_q
+                
+        # Exact continuous counterpart of Equations (1) and (2) without if/else branches
+        total_lambda = 0.0
+        for idx in range(11):
+            i = idx + 1
+            lambda_ch_i = (
+                integrate_oriented_segment(idx, s1[i], s1[i-1], ux, uy, uz) +
+                integrate_oriented_segment(idx, s2[i-1], s2[i], ux, uy, uz)
+            )
+            total_lambda += lambda_ch_i
+            
+        return total_lambda
+
+    # Double angular quadrature over the visible internal hemisphere
+    integrand = lambda alpha, beta: get_continuous_areal_density(alpha, beta) * np.cos(alpha) * np.sin(alpha)
+    integral_val, _ = dblquad(
+        integrand, 0.0, 2.0*np.pi, lambda x: 0.0, lambda x: np.pi/2.0,
+        epsabs=1e-5, epsrel=1e-5
+    )
+    
+    # Unscattered baseline (C = 0 -> 1 - C = 1)
+    g_net = G * integral_val
+    
+    # Kinematic centrifugal subtraction at equator
+    if station_type == 'equator' and omega > 0.0:
+        return g_net - (omega**2) * a_surf
+    return g_net
+
+# --- EXECUTION TESTBENCH (C = 0) ---
+omega_earth = 7.292115e-5
+g_pol_c0 = calculate_gravity_pg_prem_continuous(prem_continuous_11, station_type='polar', omega=omega_earth)
+g_eq_c0  = calculate_gravity_pg_prem_continuous(prem_continuous_11, station_type='equator', omega=omega_earth)
+
+print(f"Continuous PREM (C=0) Polar Gravity      : {g_pol_c0:.4f} m/s^2")
+print(f"Continuous PREM (C=0) Equatorial Gravity : {g_eq_c0:.4f} m/s^2")
+\end{lstlisting}
+%
+\begin{lstlisting}[language=Python, caption={Generalized N-layer Push Gravity (PG) integration script with automated bulk mass and moment-of-inertia verification (C = 0).}, label={lst:pg_inner_planets_verified}]
+import numpy as np
+from scipy.integrate import dblquad
+
+def get_flattening_profile(planet_params):
+    """Returns the array of layer flattenings f_i according to Clairaut scaling."""
+    n_layers = len(planet_params['a'])
+    if 'f' in planet_params:
+        return np.array(planet_params['f'], dtype=float)
+    f_surf = float(planet_params['f_surf'])
+    return np.linspace(0.72 * f_surf, f_surf, n_layers) if f_surf > 0.0 else np.zeros(n_layers)
+
+def verify_planetary_constraints(planet_params):
+    """
+    Computes bulk mass M and normalized polar moment of inertia I/(M*R_eq^2)
+    for nested oblate spheroidal shells to verify geodetic consistency.
+    """
+    a = np.array(planet_params['a'], dtype=float)
+    rho = np.array(planet_params['rho'], dtype=float)
+    f = get_flattening_profile(planet_params)
+    c = a * (1.0 - f)
+    
+    total_mass = 0.0
+    total_inertia_z = 0.0
+    
+    for idx in range(len(a)):
+        # Outer boundary volume and polar moment of inertia factor of ellipsoid
+        V_out = (4.0 / 3.0) * np.pi * (a[idx]**2) * c[idx]
+        Iz_out = 0.4 * V_out * (a[idx]**2)
+        
+        if idx == 0:
+            V_in, Iz_in = 0.0, 0.0
+        else:
+            V_in = (4.0 / 3.0) * np.pi * (a[idx-1]**2) * c[idx-1]
+            Iz_in = 0.4 * V_in * (a[idx-1]**2)
+            
+        shell_mass = rho[idx] * (V_out - V_in)
+        shell_inertia = rho[idx] * (Iz_out - Iz_in)
+        
+        total_mass += shell_mass
+        total_inertia_z += shell_inertia
+        
+    moi_factor = total_inertia_z / (total_mass * (a[-1]**2))
+    return total_mass, moi_factor
+
+def calculate_gravity_pg_generalized(planet_params, station_type='equator', C_coeff=0.0):
+    """
+    Computes effective surface gravity (g_eff) using the exact shell-by-shell 
+    chord segmentation algorithm for an arbitrary N-layer oblate spheroid.
+    """
+    G = 6.67430e-11
+    a = np.array(planet_params['a'], dtype=float)
+    rho = np.array(planet_params['rho'], dtype=float)
+    f = get_flattening_profile(planet_params)
+    c = a * (1.0 - f)
+    
+    omega = float(planet_params['omega'])
+    n_layers = len(a)
+    a_surf, c_surf = a[-1], c[-1]
+    
+    # Origin station P coordinates in global planetary frame
+    if station_type == 'polar':
+        X_P, Y_P, Z_P = 0.0, 0.0, c_surf
+    else:
+        X_P, Y_P, Z_P = a_surf, 0.0, 0.0
+
+    def get_chord_areal_density(alpha, beta):
+        # Directional unit vectors relative to local internal normal at P
+        if station_type == 'polar':
+            ux = np.sin(alpha) * np.cos(beta)
+            uy = np.sin(alpha) * np.sin(beta)
+            uz = -np.cos(alpha)
+        else:
+            ux = -np.cos(alpha)
+            uy = np.sin(alpha) * np.cos(beta)
+            uz = np.sin(alpha) * np.sin(beta)
+            
+        s1 = np.zeros(n_layers + 1)
+        s2 = np.zeros(n_layers + 1)
+        
+        # Solve quadratic boundary intersections for layers i = 1..N
+        for idx in range(n_layers):
+            i = idx + 1
+            ai, ci = a[idx], c[idx]
+            
+            A_q = (ux**2 + uy**2) / ai**2 + (uz**2) / ci**2
+            B_q = (X_P*ux + Y_P*uy) / ai**2 + (Z_P*uz) / ci**2
+            C_q = (X_P**2 + Y_P**2) / ai**2 + (Z_P**2) / ci**2 - 1.0
+            
+            disc = B_q**2 - A_q*C_q
+            if disc >= 0.0:
+                sqrt_d = np.sqrt(disc)
+                r1 = (-B_q - sqrt_d) / A_q
+                r2 = (-B_q + sqrt_d) / A_q
+                s1[i] = min(r1, r2)
+                s2[i] = max(r1, r2)
+                
+        # Exact shell-by-shell segmentation (Equations 1 & 2)
+        total_lambda = 0.0
+        for idx in range(n_layers):
+            i = idx + 1
+            delta_s = s1[i-1] - s1[i] + s2[i] - s2[i-1]
+            total_lambda += rho[idx] * delta_s
+            
+        return total_lambda
+
+    # Double angular integration over the visible internal hemisphere
+    integrand = lambda alpha, beta: get_chord_areal_density(alpha, beta) * np.cos(alpha) * np.sin(alpha)
+    integral_val, _ = dblquad(
+        integrand, 0.0, 2.0*np.pi, lambda x: 0.0, lambda x: np.pi/2.0,
+        epsabs=1e-5, epsrel=1e-5
+    )
+    
+    # Pure gravitational acceleration under direct mapping (Lambda^2 * u_e0 / 4pi = G)
+    g_net = G * (1.0 - C_coeff) * integral_val
+    
+    # Kinematic centrifugal subtraction at the equator
+    if station_type == 'equator' and omega != 0.0:
+        g_eff = g_net - (omega**2) * a_surf
+    else:
+        g_eff = g_net
+        
+    return g_eff
+
+# --- MASS- AND INERTIA-CONSTRAINED INNER SOLAR SYSTEM DATASETS ---
+inner_planets_data = {
+    'Moon': {
+        'a': [240.0e3, 380.0e3, 1693.1e3, 1738.1e3],
+        'rho': [7398.0, 5194.0, 3379.0, 2595.0],
+        'f_surf': 0.0012,
+        'omega': 2.662e-6
+    },
+    'Mercury': {
+        'a': [2020.0e3, 2399.7e3, 2439.7e3],
+        'rho': [7197.0, 3159.0, 2755.0],
+        'f_surf': 0.0009,
+        'omega': 1.240e-6
+    },
+    'Venus': {
+        'a': [3200.0e3, 5390.0e3, 6021.8e3, 6051.8e3],
+        'rho': [10827.0, 4672.0, 3550.0, 2900.0],
+        'f_surf': 0.0000,
+        'omega': -2.992e-7
+    },
+    'Mars': {
+        'a': [600.0e3, 1680.0e3, 1835.0e3, 3354.2e3, 3396.2e3],
+        'rho': [7500.0, 6500.0, 4400.0, 3575.0, 2700.0],
+        'f_surf': 0.00589,
+        'omega': 7.088e-5
+    }
+}
+
+# --- EXECUTION & GEODETIC CONSTRAINT VERIFICATION LOOP (C = 0) ---
+print("=== PUSH GRAVITY: INNER SOLAR SYSTEM VERIFICATION (C = 0) ===")
+for name, params in inner_planets_data.items():
+    mass, moi = verify_planetary_constraints(params)
+    g_eq  = calculate_gravity_pg_generalized(params, station_type='equator', C_coeff=0.0)
+    g_pol = calculate_gravity_pg_generalized(params, station_type='polar', C_coeff=0.0)
+    print(f"{name:8s} | M: {mass:.4e} kg | I/MR^2: {moi:.4f} | g_eq: {g_eq:.3f} | g_pol: {g_pol:.3f} m/s^2")
+\end{lstlisting}
+%
+\begin{lstlisting}[language=Python, caption={Generalized N-layer Push Gravity (PG) integration script with automated bulk mass, moment-of-inertia, and Newtonian J2 multipole benchmarking (C = 0).}, label={lst:pg_inner_planets_full}]
+import numpy as np
+from scipy.integrate import dblquad
+
+def get_flattening_profile(planet_params):
+    """Returns the array of layer flattenings f_i according to Clairaut scaling."""
+    n_layers = len(planet_params['a'])
+    if 'f' in planet_params:
+        return np.array(planet_params['f'], dtype=float)
+    f_surf = float(planet_params['f_surf'])
+    return np.linspace(0.72 * f_surf, f_surf, n_layers) if f_surf > 0.0 else np.zeros(n_layers)
+
+def verify_planetary_constraints(planet_params):
+    """
+    Computes bulk mass M, normalized polar moment of inertia I_z/(M*R_eq^2),
+    and the dynamical zonal harmonic J2 for nested oblate spheroidal shells.
+    """
+    a = np.array(planet_params['a'], dtype=float)
+    rho = np.array(planet_params['rho'], dtype=float)
+    f = get_flattening_profile(planet_params)
+    c = a * (1.0 - f)
+    
+    total_mass = 0.0
+    total_Iz = 0.0
+    total_Ix = 0.0
+    
+    for idx in range(len(a)):
+        V_out = (4.0 / 3.0) * np.pi * (a[idx]**2) * c[idx]
+        Iz_out = 0.4 * V_out * (a[idx]**2)
+        Ix_out = 0.2 * V_out * (a[idx]**2 + c[idx]**2)
+        
+        if idx == 0:
+            V_in, Iz_in, Ix_in = 0.0, 0.0, 0.0
+        else:
+            V_in = (4.0 / 3.0) * np.pi * (a[idx-1]**2) * c[idx-1]
+            Iz_in = 0.4 * V_in * (a[idx-1]**2)
+            Ix_in = 0.2 * V_in * (a[idx-1]**2 + c[idx-1]**2)
+            
+        total_mass += rho[idx] * (V_out - V_in)
+        total_Iz += rho[idx] * (Iz_out - Iz_in)
+        total_Ix += rho[idx] * (Ix_out - Ix_in)
+        
+    a_surf = a[-1]
+    moi_factor = total_Iz / (total_mass * (a_surf**2))
+    # MacCullagh's formula for zonal harmonic J2
+    J2 = (total_Iz - total_Ix) / (total_mass * (a_surf**2))
+    
+    return total_mass, moi_factor, J2
+
+def compute_newtonian_j2_gravity(planet_params, mass, J2):
+    """
+    Computes standard macroscopic Newtonian surface gravity at the equator 
+    and poles using first-order spherical harmonic expansion up to J2.
+    """
+    G = 6.67430e-11
+    a_surf = float(planet_params['a'][-1])
+    f_surf = float(planet_params['f_surf'])
+    c_surf = a_surf * (1.0 - f_surf)
+    omega = float(planet_params['omega'])
+    
+    # Equatorial effective gravity (including centrifugal reduction)
+    g_eq_grav = (G * mass / (a_surf**2)) * (1.0 + 1.5 * J2)
+    g_eq_newt = g_eq_grav - (omega**2) * a_surf
+    
+    # Polar gravity
+    g_pol_newt = (G * mass / (c_surf**2)) * (1.0 - 3.0 * J2)
+    
+    return g_eq_newt, g_pol_newt
+
+def calculate_gravity_pg_generalized(planet_params, station_type='equator', C_coeff=0.0):
+    """
+    Computes effective surface gravity (g_eff) using the exact shell-by-shell 
+    chord segmentation algorithm for an arbitrary N-layer oblate spheroid.
+    """
+    G = 6.67430e-11
+    a = np.array(planet_params['a'], dtype=float)
+    rho = np.array(planet_params['rho'], dtype=float)
+    f = get_flattening_profile(planet_params)
+    c = a * (1.0 - f)
+    
+    omega = float(planet_params['omega'])
+    n_layers = len(a)
+    a_surf, c_surf = a[-1], c[-1]
+    
+    if station_type == 'polar':
+        X_P, Y_P, Z_P = 0.0, 0.0, c_surf
+    else:
+        X_P, Y_P, Z_P = a_surf, 0.0, 0.0
+
+    def get_chord_areal_density(alpha, beta):
+        if station_type == 'polar':
+            ux = np.sin(alpha) * np.cos(beta)
+            uy = np.sin(alpha) * np.sin(beta)
+            uz = -np.cos(alpha)
+        else:
+            ux = -np.cos(alpha)
+            uy = np.sin(alpha) * np.cos(beta)
+            uz = np.sin(alpha) * np.sin(beta)
+            
+        s1 = np.zeros(n_layers + 1)
+        s2 = np.zeros(n_layers + 1)
+        
+        for idx in range(n_layers):
+            i = idx + 1
+            ai, ci = a[idx], c[idx]
+            
+            A_q = (ux**2 + uy**2) / ai**2 + (uz**2) / ci**2
+            B_q = (X_P*ux + Y_P*uy) / ai**2 + (Z_P*uz) / ci**2
+            C_q = (X_P**2 + Y_P**2) / ai**2 + (Z_P**2) / ci**2 - 1.0
+            
+            disc = B_q**2 - A_q*C_q
+            if disc >= 0.0:
+                sqrt_d = np.sqrt(disc)
+                r1 = (-B_q - sqrt_d) / A_q
+                r2 = (-B_q + sqrt_d) / A_q
+                s1[i] = min(r1, r2)
+                s2[i] = max(r1, r2)
+                
+        total_lambda = 0.0
+        for idx in range(n_layers):
+            i = idx + 1
+            delta_s = s1[i-1] - s1[i] + s2[i] - s2[i-1]
+            total_lambda += rho[idx] * delta_s
+            
+        return total_lambda
+
+    integrand = lambda alpha, beta: get_chord_areal_density(alpha, beta) * np.cos(alpha) * np.sin(alpha)
+    integral_val, _ = dblquad(
+        integrand, 0.0, 2.0*np.pi, lambda x: 0.0, lambda x: np.pi/2.0,
+        epsabs=1e-5, epsrel=1e-5
+    )
+    
+    g_net = G * (1.0 - C_coeff) * integral_val
+    if station_type == 'equator' and omega != 0.0:
+        return g_net - (omega**2) * a_surf
+    return g_net
+
+# --- MASS- AND INERTIA-CONSTRAINED INNER SOLAR SYSTEM DATASETS ---
+inner_planets_data = {
+    'Moon': {
+        'a': [240.0e3, 380.0e3, 1693.1e3, 1738.1e3],
+        'rho': [7398.0, 5194.0, 3379.0, 2595.0],
+        'f_surf': 0.0012,
+        'omega': 2.662e-6
+    },
+    'Mercury': {
+        'a': [2020.0e3, 2399.7e3, 2439.7e3],
+        'rho': [7197.0, 3159.0, 2755.0],
+        'f_surf': 0.0009,
+        'omega': 1.240e-6
+    },
+    'Venus': {
+        'a': [3200.0e3, 5390.0e3, 6021.8e3, 6051.8e3],
+        'rho': [10827.0, 4672.0, 3550.0, 2900.0],
+        'f_surf': 0.0000,
+        'omega': -2.992e-7
+    },
+    'Mars': {
+        'a': [600.0e3, 1680.0e3, 1835.0e3, 3354.2e3, 3396.2e3],
+        'rho': [7500.0, 6500.0, 4400.0, 3575.0, 2700.0],
+        'f_surf': 0.00589,
+        'omega': 7.088e-5
+    }
+}
+
+# --- EXECUTION & BENCHMARKING LOOP (C = 0) ---
+print("=== PUSH GRAVITY VS. NEWTONIAN J2 BENCHMARK (C = 0) ===")
+for name, params in inner_planets_data.items():
+    mass, moi, J2 = verify_planetary_constraints(params)
+    g_eq_pg   = calculate_gravity_pg_generalized(params, station_type='equator', C_coeff=0.0)
+    g_pol_pg  = calculate_gravity_pg_generalized(params, station_type='polar', C_coeff=0.0)
+    g_eq_newt, g_pol_newt = compute_newtonian_j2_gravity(params, mass, J2)
+    
+    print(f"{name:8s} | M: {mass:.3e} | I/MR^2: {moi:.4f} | J2: {J2:.2e}")
+    print(f"         -> PG   : g_eq = {g_eq_pg:.3f} m/s^2, g_pol = {g_pol_pg:.3f} m/s^2")
+    print(f"         -> Newt : g_eq = {g_eq_newt:.3f} m/s^2, g_pol = {g_pol_newt:.3f} m/s^2")
+\end{lstlisting}
+%
+\begin{lstlisting}[language=Python, caption={Continuous space Push Gravity (PG) integration engine for Earth using original 11-layer PREM cubic density polynomials (Dziewonski \& Anderson, 1981) in the unscattered limit (C = 0).}, label={lst:pg_earth_prem_continuous}]
+import numpy as np
+from scipy.integrate import dblquad
+
+# Original 11-Layer PREM Polynomial Coefficients (Dziewonski & Anderson, 1981)
+# Ordered from Layer 1 (Inner Core) to Layer 11 (Upper Crust / Ocean avg)
+# rho_i(x) = c0 + c1*x + c2*x^2 + c3*x^3 [kg/m^3], where x = r_eq / a_surf
+prem_continuous_11 = {
+    'a': [1221.5e3, 3480.0e3, 3630.0e3, 5701.0e3, 5771.0e3, 
+          5971.0e3, 6151.0e3, 6291.0e3, 6346.6e3, 6356.0e3, 6371.0e3],
+    'f': list(np.linspace(1.0/415.0, 1.0/298.257, 11)),
+    'poly': [
+        [13088.5,     0.0,  -8838.1,     0.0], # 1: Inner Core (0 - 1221.5 km)
+        [12581.5, -1263.8,  -3642.6, -5528.1], # 2: Outer Core (1221.5 - 3480 km)
+        [ 7956.5, -6476.1,   5528.3, -3080.7], # 3: D'' Layer (3480 - 3630 km)
+        [ 7956.5, -6476.1,   5528.3, -3080.7], # 4: Lower Mantle Base (3630 - 5701 km)
+        [ 5319.7, -1483.6,      0.0,     0.0], # 5: Lower Mantle Upper (5701 - 5771 km)
+        [11249.4, -8029.8,      0.0,     0.0], # 6: Transition Zone (5771 - 5971 km)
+        [ 7108.9, -3804.5,      0.0,     0.0], # 7: Transition Zone (5971 - 6151 km)
+        [ 2691.0,   692.4,      0.0,     0.0], # 8: LVZ / LID (6151 - 6291 km)
+        [ 2691.0,   692.4,      0.0,     0.0], # 9: Upper Mantle (6291 - 6346.6 km)
+        [ 2900.0,     0.0,      0.0,     0.0], # 10: Lower Crust (6346.6 - 6356 km)
+        [ 2600.0,     0.0,      0.0,     0.0]  # 11: Upper Crust / Ocean (6356 - 6371 km)
+    ]
+}
+
+# 5-point Gauss-Legendre quadrature nodes and weights (exact up to degree 9)
+GL_NODES, GL_WEIGHTS = np.polynomial.legendre.leggauss(5)
+
+def calculate_gravity_pg_prem_continuous(planet_params, station_type='equator', omega=0.0):
+    """
+    Computes effective surface gravity (g_eff) with C = 0 using continuous space 
+    integration along ellipsoidal chords and original PREM density polynomials.
+    Preserves the exact branch-free boundary segmentation algorithm.
+    """
+    G = 6.67430e-11
+    a = np.array(planet_params['a'], dtype=float)
+    f = np.array(planet_params['f'], dtype=float)
+    c = a * (1.0 - f)
+    polys = np.array(planet_params['poly'], dtype=float)
+    
+    a_surf = a[-1]
+    c_surf = c[-1]
+    
+    # Station P coordinates in global Cartesian frame
+    if station_type == 'polar':
+        X_P, Y_P, Z_P = 0.0, 0.0, c_surf
+    else:
+        X_P, Y_P, Z_P = a_surf, 0.0, 0.0
+
+    def eval_rho_layer(idx, s_val, ux, uy, uz):
+        # 3D position vector X(s) = X_P + s * u
+        X = X_P + s_val * ux
+        Y = Y_P + s_val * uy
+        Z = Z_P + s_val * uz
+        # Normalized equivalent ellipsoidal radius x (unclamped for exact algebraic cancellation)
+        fi = f[idx]
+        r_eq = np.sqrt(X**2 + Y**2 + (Z / (1.0 - fi))**2)
+        x = r_eq / a_surf
+        c0, c1, c2, c3 = polys[idx]
+        return c0 + c1*x + c2*(x**2) + c3*(x**3)
+
+    def integrate_oriented_segment(idx, s_start, s_end, ux, uy, uz):
+        # Oriented line integral from s_start to s_end preserving sign
+        half_len = 0.5 * (s_end - s_start)
+        if half_len == 0.0:
+            return 0.0
+        mid_pt = 0.5 * (s_end + s_start)
+        acc = 0.0
+        for node, weight in zip(GL_NODES, GL_WEIGHTS):
+            s_q = mid_pt + half_len * node
+            acc += weight * eval_rho_layer(idx, s_q, ux, uy, uz)
+        return half_len * acc
+
+    def get_continuous_areal_density(alpha, beta):
+        # Directional unit vector mapped from local normal at P
+        if station_type == 'polar':
+            ux = np.sin(alpha) * np.cos(beta)
+            uy = np.sin(alpha) * np.sin(beta)
+            uz = -np.cos(alpha)
+        else:
+            ux = -np.cos(alpha)
+            uy = np.sin(alpha) * np.cos(beta)
+            uz = np.sin(alpha) * np.sin(beta)
+            
+        s1 = np.zeros(12)
+        s2 = np.zeros(12)
+        
+        # Solve quadratic intersection A_i*s^2 + 2*B_i*s + C_i = 0 for i = 1..11
+        for idx in range(11):
+            i = idx + 1
+            ai, ci = a[idx], c[idx]
+            A_q = (ux**2 + uy**2)/ai**2 + (uz**2)/ci**2
+            B_q = (X_P*ux + Y_P*uy)/ai**2 + (Z_P*uz)/ci**2
+            C_q = (X_P**2 + Y_P**2)/ai**2 + (Z_P**2)/ci**2 - 1.0
+            disc = B_q**2 - A_q*C_q
+            if disc >= 0.0:
+                sqrt_d = np.sqrt(disc)
+                s1[i] = (-B_q - sqrt_d) / A_q
+                s2[i] = (-B_q + sqrt_d) / A_q
+                
+        # Exact continuous counterpart of Equations (1) and (2) without if/else branches
+        total_lambda = 0.0
+        for idx in range(11):
+            i = idx + 1
+            lambda_ch_i = (
+                integrate_oriented_segment(idx, s1[i], s1[i-1], ux, uy, uz) +
+                integrate_oriented_segment(idx, s2[i-1], s2[i], ux, uy, uz)
+            )
+            total_lambda += lambda_ch_i
+            
+        return total_lambda
+
+    # Double angular quadrature over the visible internal hemisphere
+    integrand = lambda alpha, beta: get_continuous_areal_density(alpha, beta) * np.cos(alpha) * np.sin(alpha)
+    integral_val, _ = dblquad(
+        integrand, 0.0, 2.0*np.pi, lambda x: 0.0, lambda x: np.pi/2.0,
+        epsabs=1e-5, epsrel=1e-5
+    )
+    
+    # Unscattered baseline (C = 0 -> 1 - C = 1)
+    g_net = G * integral_val
+    
+    # Kinematic centrifugal subtraction at equator
+    if station_type == 'equator' and omega > 0.0:
+        return g_net - (omega**2) * a_surf
+    return g_net
+
+# --- EXECUTION TESTBENCH (C = 0) ---
+omega_earth = 7.292115e-5
+g_pol_c0 = calculate_gravity_pg_prem_continuous(prem_continuous_11, station_type='polar', omega=omega_earth)
+g_eq_c0  = calculate_gravity_pg_prem_continuous(prem_continuous_11, station_type='equator', omega=omega_earth)
+
+print("=== EARTH CONTINUOUS POLYNOMIAL PREM (C = 0) ===")
+print(f"Effective Polar Gravity      : {g_pol_c0:.4f} m/s^2 (Ref: 9.8322)")
+print(f"Effective Equatorial Gravity : {g_eq_c0:.4f} m/s^2 (Ref: 9.7803)")
+\end{lstlisting}
 
